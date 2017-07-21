@@ -67,6 +67,39 @@ def plot_bollinger_band(df, window=20, title='Bollinger Bands', stock_label='Sto
     ax.grid()
     plt.show()    
     
+    
+def get_bollinger_bands(df, window=20, show_plot=True, title='Bollinger Bands'):
+    """ Compute bollinger bands of a stock and plot all together """    
+
+    # 1.Compute rolling mean
+    rm_Stock = df.rolling(window=window).mean()
+    # 2.Compute rolling standard deviation
+    rstd_Stock = df.rolling(window=window).std()
+    # 3. Compute upper and lower bands
+    upper_band = rm_Stock + 2*rstd_Stock
+    lower_band = rm_Stock - 2*rstd_Stock
+
+    rm_Stock.name = 'rolling_mean'
+    upper_band.name = 'upper_band'
+    lower_band.name = 'lower_band'
+    
+    # Plot
+    if show_plot:
+        ax = df.plot(title=title, figsize=(15,8))
+        rm_Stock.plot(label='Rolling mean', ax=ax)
+        upper_band.plot(label='upper band', ax=ax)
+        lower_band.plot(label='lower band', ax=ax)
+
+        # Add axis labels and legends
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Price")
+        ax.legend(loc="upper left")
+        ax.grid()
+        plt.show()  
+    
+    return pd.concat([df, rm_Stock, upper_band, lower_band], axis=1)
+
+    
 
 def compute_daily_returns(df):
     """ Compute daily returns """   
