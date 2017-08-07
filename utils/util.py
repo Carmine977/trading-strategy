@@ -126,6 +126,15 @@ def compute_sharpe_ratio(df, daily_rf=0, samples_per_year=252):
     return sharpe_ratio
 
 
+def get_portfolio_stats(df, daily_rf=0, samples_per_year=252):
+    daily_returns = compute_daily_returns(df)
+    sharpe_ratio = compute_sharpe_ratio(df, daily_rf, samples_per_year)
+    cum_ret = compute_cumulative_returns(df)
+    avg_daily_ret = daily_returns.mean()
+    std_daily_ret = daily_returns.std()
+    return sharpe_ratio, cum_ret, avg_daily_ret, std_daily_ret
+
+
 def get_portfolio_value(prices, allocs, start_val=1):
     """Computes the daily portfolio value given daily prices for each stock in portfolio, 
     initial allocations(as fractions that sum to 1) and total starting value invested in portfolio"""
