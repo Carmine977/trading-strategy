@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 from itertools import izip
 get_ipython().magic(u'matplotlib inline')
 
-def simulate_strategy(date_start, date_end, folder_strategy, file_strategy):
+def simulate_strategy(date_start, date_end, folder_strategy, file_strategy, events=True):
 
     dates = pd.date_range(date_start, date_end)
     file_name = os.path.join(folder_strategy, '{}.csv'.format(file_strategy))
@@ -22,24 +22,32 @@ def simulate_strategy(date_start, date_end, folder_strategy, file_strategy):
 
     # Back-Testing Algorithm
     df['daily_val'] = 0.0
+    df['shorting'] = 1.0
     hold = False
+    shorting = False
 
     # Compute portfolio daily value
     for i, row in df.iterrows():
     
-        if row['Order'] == 'BUY':
+        if (row['Order'] == 'BUY LONG') | (row['Order'] == 'SELL SHORT'):
             hold = True
             n_stocks = row['Shares']
+            if row['Order'] == 'SELL SHORT':
+                shorting = True            
     
         if hold == True:
             df.loc[i, 'Shares'] = n_stocks # replicate shares when stock is hold
             df.loc[i, 'daily_val'] = n_stocks * row[stock]
-
-        if row['Order'] == 'SELL':
+            if shorting:
+                df.loc[i, 'shorting'] = -1.0
+                    
+        if (row['Order'] == 'EXIT LONG') | (row['Order'] == 'EXIT SHORT'):
             hold = False
-
+            shorting = False
+        
     # Compute daily returns
-    df['daily_return'] = df['daily_val'].diff()        
+    df['daily_return'] = df['daily_val'].diff()   
+    df['daily_return'] = df['daily_return'] * df['shorting']
     # Reset to 0 NaN and not valid daily_returns  
     df.ix[0, 'daily_return'] = 0
     for (index1, row1),(index2, row2) in izip(df.iterrows(), df[1:].iterrows()):
@@ -48,19 +56,23 @@ def simulate_strategy(date_start, date_end, folder_strategy, file_strategy):
     df['cum_return'] = df['daily_return'].cumsum()
 
     # Compute cumulative portfolio value
-    T0 = df[df['Order']=='BUY'].index[0] # Timestamp @ first investment 
+    T0 = df[~pd.isnull(df['Order'])].index[0] # Timestamp @ first investment 
     Val0 = df.ix[T0]['daily_val'] # Initial portfolio value
     df['port_val'] = df['cum_return'] + Val0
+    
 
     # Plot Section
     df_temp = pd.concat([df[stock]/df.ix[0][stock], df['port_val']/df.ix[T0]['port_val']], keys=[stock, 'Portfolio'], axis=1)
     ax = df_temp.plot(figsize=(15, 10))
     # Plot events
-    for day, key in orders.iterrows():
-        if key['Order'] == 'BUY':
-            ax.axvline(x=day, color='green')
-        elif key['Order'] == 'SELL':
-            ax.axvline(x=day, color='red')
+    if events:
+        for day, key in orders.iterrows():
+            if key['Order'] == 'BUY LONG':
+                ax.axvline(x=day, color='green')
+            elif key['Order'] == 'SELL SHORT':
+                ax.axvline(x=day, color='red')
+            elif (key['Order'] == 'EXIT LONG') | (key['Order'] == 'EXIT SHORT'):
+                ax.axvline(x=day, color='black')
     plt.show()   
 
     # Compute stats sections
@@ -68,9 +80,6 @@ def simulate_strategy(date_start, date_end, folder_strategy, file_strategy):
     sharpe_ratio_stock, cum_ret_stock, avg_daily_ret_stock, std_daily_ret_stock = get_portfolio_stats(df[stock])
 
     # Compare portfolio against stock
-    print "Sharpe Ratio of Fund: {}".format(sharpe_ratio)
-    print "Sharpe Ratio of {}: {}".format(stock, sharpe_ratio_stock)
-    print
     print "Cumulative Return of Fund: {}".format(cum_ret)
     print "Cumulative Return of {}: {}".format(stock, cum_ret_stock)
     print
@@ -79,6 +88,9 @@ def simulate_strategy(date_start, date_end, folder_strategy, file_strategy):
     print
     print "Average Daily Return of Fund: {}".format(avg_daily_ret)
     print "Average Daily Return of {}: {}".format(stock, avg_daily_ret_stock)
+    print
+    print "Sharpe Ratio of Fund: {}".format(sharpe_ratio)
+    print "Sharpe Ratio of {}: {}".format(stock, sharpe_ratio_stock)
     print
     print "Initial Portfolio Value: {}".format(df['port_val'][0])
     print "Final Portfolio Value: {}".format(df['port_val'][-1])
